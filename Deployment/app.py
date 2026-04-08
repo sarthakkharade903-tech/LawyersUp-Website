@@ -24,9 +24,9 @@ from services.email_service import send_email
 # ═══════════════════════════════════════════════════════════════
 
 load_dotenv()
-GROQ_API_KEY = st.secrets("GROQ_API_KEY")
-EMAIL_USER = st.secrets("EMAIL_USER")
-EMAIL_PASS = st.secrets("EMAIL_PASS")
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+EMAIL_USER = st.secrets["EMAIL_USER"]
+EMAIL_PASS = st.secrets["EMAIL_PASS"]
 
 # ═══════════════════════════════════════════════════════════════
 # SIDEBAR
