@@ -49,7 +49,9 @@ def get_tone_for_category(category: str) -> str:
 import json
 import os
 
-def get_authority_details(issue_type: str, location: str) -> dict | None:
+from typing import Optional
+
+def get_authority_details(issue_type: str, location: str) -> Optional[dict]:
     """
     Fetch smart authority details based on issue_type and user's location.
     Looks up categories in data/authorities.json and falls back to default.
