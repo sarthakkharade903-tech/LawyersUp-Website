@@ -178,6 +178,7 @@ def generate_complaint_draft(
     language: str,
     user_problem: str,
     personal_details: str,
+    dynamic_fields: dict,
     groq_api_key: str,
 ) -> dict:
     """
@@ -201,29 +202,44 @@ def generate_complaint_draft(
         "Content-Type": "application/json",
     }
 
+    dynamic_fields_text = ""
+    if dynamic_fields:
+        provided_fields = {k: v for k, v in dynamic_fields.items() if v.strip()}
+        if provided_fields:
+            dynamic_fields_text = "\\nInclude the following details if available:\\n"
+            for k, v in provided_fields.items():
+                dynamic_fields_text += f"{k}: {v}\\n"
+
     draft_prompt = f"""
                 You are an expert Indian Legal Assistant and an experienced advocate.
                 
                 DETECTED CATEGORY: {category}
                 RECOMMENDED AUTHORITY: {custom_authority}
                 
-                Your task is to draft a highly professional, specific, and detailed {custom_doc_type} based exactly on the user's situation. 
+                Your task is to draft a highly professional, specific, and detailed {custom_doc_type} based ONLY on the user's situation. 
                 The document MUST be explicitly addressed to: {custom_authority}.
                 
                 CRITICAL INSTRUCTIONS:
-                1. DO NOT output a generic template. You MUST write a detailed, narrative-driven complaint using the specific facts provided in the "User's Specific Problem" section below. Extract all possible facts (dates, amounts, actions) from the problem.
+                1. DO NOT output a generic template. You MUST write a detailed complaint using ONLY the specific facts provided in the "User's Specific Problem" section below. Extract all possible facts (dates, amounts, actions) from the problem.
                 2. Adapt the facts logically into formal Indian legal language. The tone should be: {default_tone}.
                 3. Include a precise and professional Subject Line reflecting the severity of the issue.
                 4. At the very TOP of the document, include the line:
                    "Recommended Authority: {custom_authority}"
                 5. Structure the draft into clear paragraphs:
                    - Introduction (Who is complaining and against whom/what).
-                   - Detailed Account of Incident (Chronological narrative based strictly on the user's problem).
+                   - Detailed Account of Incident (Chronological narrative based STRICTLY on the user's problem).
                    - Legal Grounds / Impact (The harm or consequences faced by the complainant).
                    - Prayer/Relief Requested (Specific action demanded, such as an immediate investigation, refund, or disciplinary action).
+                   
+                STRICT FACTUAL RULES:
+                - Do NOT add or assume any facts that are not explicitly mentioned in the input.
+                - Do NOT create imaginary events, people, or actions.
+                - If details like number of people, exact actions, or severity are missing, write in a neutral and general way.
+                - Do NOT exaggerate or dramatize the situation. Ensure factual accuracy over storytelling.
                 
                 Please seamlessly and naturally integrate the following personal details into the body and the signature block of the draft:
                 {personal_details}
+                {dynamic_fields_text}
                 
                 *IMPORTANT*: If any of the personal details above are enclosed in brackets like [Your Name] or [Location], keep them EXACTLY as bracketed placeholders in the text so the user can fill them in later. Do not invent details for placeholders.
                 

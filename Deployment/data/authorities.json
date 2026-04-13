@@ -1,0 +1,53 @@
+{
+  "Cybercrime": {
+    "mumbai": {
+      "name": "Mumbai Cyber Crime Cell",
+      "website": "https://cybercrime.gov.in/",
+      "email": "cybercell.mumbai@mahapolice.gov.in"
+    },
+    "pune": {
+      "name": "Pune Police Cyber Crime Cell",
+      "website": "https://punepolice.gov.in/",
+      "email": "crimecyber.pune@nic.in"
+    },
+    "default": {
+      "name": "National Cyber Crime Reporting Portal",
+      "website": "https://cybercrime.gov.in/",
+      "email": "complaint-cyber@gov.in"
+    }
+  },
+  "Consumer Issues": {
+    "mumbai": {
+      "name": "District Consumer Disputes Redressal Commission, Mumbai",
+      "website": "https://confonet.nic.in/",
+      "email": "nch-krishi@gov.in"
+    },
+    "pune": {
+      "name": "District Consumer Disputes Redressal Commission, Pune",
+      "website": "https://confonet.nic.in/",
+      "email": "nch-krishi@gov.in"
+    },
+    "default": {
+      "name": "National Consumer Helpline (NCH)",
+      "website": "https://consumerhelpline.gov.in/",
+      "email": "nch-krishi@gov.in"
+    }
+  },
+  "Harassment (General)": {
+    "mumbai": {
+      "name": "Mumbai Police Control Room / Local Station",
+      "website": "https://mumbaipolice.gov.in/",
+      "email": "cp.mumbai@mahapolice.gov.in"
+    },
+    "pune": {
+      "name": "Pune Police Control Room / Local Station",
+      "website": "https://punepolice.gov.in/",
+      "email": "cp.pune@nic.in"
+    },
+    "default": {
+      "name": "National Emergency Number / Local Police",
+      "website": "https://indianpolice.gov.in/",
+      "email": "contact@mahapolice.gov.in"
+    }
+  }
+}

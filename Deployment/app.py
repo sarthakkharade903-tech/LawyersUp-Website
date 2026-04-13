@@ -1,4 +1,9 @@
-#streamlit run "Deployment\app.py"
+#TO RUN Locally --> streamlit run "Deployment\app.py"
+"""To Deploy Updated --> 
+git add .
+git commit -m "Tested and working update"
+git push
+"""
 #This file handles ONLY the UI flow and orchestrates calls to service modules.
 #No heavy logic lives here — just layout, inputs, buttons, and function calls.
 
@@ -14,7 +19,7 @@ from dotenv import load_dotenv
 # Import our modules
 from components.ui_components import render_sidebar, render_footer
 from utils.constants import ALL_CATEGORIES
-from utils.helpers import get_authority_for_category, get_doc_type_for_category, get_tone_for_category
+from utils.helpers import get_authority_for_category, get_doc_type_for_category, get_tone_for_category, get_authority_details
 from services.ai_service import analyze_legal_issue, generate_complaint_draft
 from services.pdf_service import generate_pdf
 from services.email_service import send_email
@@ -74,6 +79,13 @@ user_input = st.text_area(
     placeholder="E.g., I was defrauded of money online by a fake e-commerce website...",
 )
 
+# User location input
+user_location = st.text_input(
+    "📍 **Your Location (City):**",
+    placeholder="E.g., Pune, Mumbai (Helps us find the exact authority)",
+    help="We use this to fetch regional contact information."
+)
+
 col1, col2 = st.columns([1, 4])
 with col1:
     get_help_btn = st.button("✨ Get Legal Help", use_container_width=True)
@@ -96,6 +108,7 @@ if get_help_btn:
                 st.session_state.recommended_authority = result["recommended_authority"]
                 st.session_state.llm_response = result["response"]
                 st.session_state.user_problem = user_input
+                st.session_state.user_location = user_location
                 st.session_state.language = selected_language
                 st.session_state.complaint_draft = None  # Reset previous drafts
             else:
@@ -112,6 +125,8 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
 
     category = st.session_state.category
     recommended_authority = st.session_state.get("recommended_authority", get_authority_for_category(category))
+    stored_location = st.session_state.get("user_location", "")
+    smart_authority = get_authority_details(category, stored_location)
 
     cat_col, auth_col = st.columns([1.5, 3.5])
     with cat_col:
@@ -122,6 +137,24 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
     with auth_col:
         if category not in ["Not a Legal Issue", "Unknown Category"]:
             st.info(f"🏢 **Recommended Authority:** {recommended_authority}")
+
+    if smart_authority:
+        st.markdown("---")
+        st.markdown("### 🎯 Smart Authority Mapping")
+        st.success(f"**{smart_authority['name']}**")
+        
+        sa_col1, sa_col2 = st.columns(2)
+        with sa_col1:
+            st.markdown(f"**📧 Email:** `{smart_authority['email']}`")
+            st.link_button("🌐 Visit Official Website", smart_authority['website'], use_container_width=True)
+            
+        with sa_col2:
+            st.markdown("""
+            **Next Steps:**
+            1. Visit the official website
+            2. Submit your complaint online or via email
+            3. Save the reference number
+            """)
 
     st.markdown(st.session_state.llm_response)
 
@@ -147,17 +180,36 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
             with c_type_col2:
                 custom_authority = st.text_input("Addressing Authority (To:)", value=default_auth, help="You can override the auto-filled authority here.")
 
+            st.markdown("#### Core Details")
             f_col1, f_col2 = st.columns(2)
             with f_col1:
                 p_name = st.text_input("Full Name", placeholder="e.g. Rahul Sharma")
-                p_age = st.text_input("Age", placeholder="e.g. 30")
                 p_phone = st.text_input("Phone Number", placeholder="e.g. +91 9876543210")
                 p_email = st.text_input("Email Address", placeholder="e.g. rahul@example.com")
             with f_col2:
+                p_age = st.text_input("Age", placeholder="e.g. 30")
                 p_date = st.date_input("Date", value=datetime.today())
                 p_address = st.text_area("Your Address", height=68, placeholder="e.g. 123, Main Street, Mumbai")
-                p_location = st.text_input("Incident Location", placeholder="e.g. Mumbai, Maharashtra")
-                p_police = st.text_input("Police Station Name", placeholder="e.g. Andheri Police Station")
+
+            st.markdown("#### Case-Specific Details")
+            DYNAMIC_FIELDS = {
+                "Cybercrime": ["Transaction ID", "Amount Lost", "Platform (UPI, Bank, App, etc.)"],
+                "Fraud": ["Amount Lost", "Incident Location", "Date/Time of Incident"],
+                "Harassment (College)": ["Person Name (if known)", "Platform/Location (College, online, etc.)"],
+                "Harassment (General)": ["Person Name (if known)", "Platform/Location", "Frequency of Harassment"],
+                "Consumer Issues": ["Product/Service Name", "Company Name", "Amount Paid"],
+                "Banking / Financial Issues": ["Bank Name", "Account Number (Last 4 digits)", "Amount Disputed"],
+                "Workplace Complaints": ["Company Name", "Manager/HR/Perpetrator Name", "Duration of Issue"],
+                "Women Safety": ["Incident Location", "Date/Time of Incident", "Accused Details (if known)"]
+            }
+            
+            fields_to_show = DYNAMIC_FIELDS.get(category, ["Incident Location", "Specific Details"])
+            
+            dynamic_inputs = {}
+            dyn_cols = st.columns(2)
+            for i, field in enumerate(fields_to_show):
+                with dyn_cols[i % 2]:
+                    dynamic_inputs[field] = st.text_input(field, key=f"dyn_{field}")
 
         btn_col, empty_col2 = st.columns([1.5, 3.5])
         with btn_col:
@@ -173,8 +225,6 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
                 Phone Number: {p_phone.strip() if p_phone.strip() else '[Your Phone Number]'}
                 Email: {p_email.strip() if p_email.strip() else '[Your Email]'}
                 Date: {p_date.strftime('%d-%m-%Y')}
-                Incident Location: {p_location.strip() if p_location.strip() else '[Location]'}
-                Police Station Name: {p_police.strip() if p_police.strip() else '[Police Station Name]'}
                 """
 
                 draft_result = generate_complaint_draft(
@@ -185,6 +235,7 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
                     language=st.session_state.language,
                     user_problem=st.session_state.user_problem,
                     personal_details=personal_details,
+                    dynamic_fields=dynamic_inputs,
                     groq_api_key=GROQ_API_KEY,
                 )
 
@@ -230,7 +281,23 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
             st.markdown("### Step 2: Send Complaint via Email")
             st.caption("Enter authority email (police, principal, company, etc.)")
 
-            recipient_email = st.text_input("Recipient Email Address", placeholder="e.g. support@company.com")
+            default_email = smart_authority["email"] if smart_authority and "email" in smart_authority else ""
+
+            if default_email:
+                st.success("✅ Email auto-filled based on authority")
+                use_custom_email = st.checkbox("Override automatically detected email")
+                recipient_email = st.text_input(
+                    "Recipient Email Address", 
+                    value=default_email, 
+                    disabled=not use_custom_email
+                )
+            else:
+                st.warning("⚠️ Email not available, please enter manually")
+                recipient_email = st.text_input(
+                    "Recipient Email Address", 
+                    placeholder="e.g. support@company.com"
+                )
+
             subject = st.text_input("Email Subject", value="Official Legal Complaint Draft")
 
             st.markdown("<br>", unsafe_allow_html=True)
