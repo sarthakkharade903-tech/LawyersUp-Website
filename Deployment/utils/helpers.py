@@ -161,7 +161,7 @@ STEP_GUIDES = {
     ]
 }
 
-def get_step_guidance(category: str) -> list[tuple[str, str]]:
+def get_step_guidance(category: str) -> list:
     """
     Returns an ordered list of step guiding tuples (Title, Description) 
     based on the input category. Returns empty list if not found.

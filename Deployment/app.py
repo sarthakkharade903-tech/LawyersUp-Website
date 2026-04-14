@@ -1,7 +1,7 @@
 #TO RUN Locally --> streamlit run "Deployment\app.py"
 """To Deploy Updated --> 
 git add .
-git commit -m "Tested and working update"
+git commit -m "Step-by-Step Guidance"
 git push
 """
 #This file handles ONLY the UI flow and orchestrates calls to service modules.
