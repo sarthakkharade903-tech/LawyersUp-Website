@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 # Import our modules
 from components.ui_components import render_sidebar, render_footer
 from utils.constants import ALL_CATEGORIES
-from utils.helpers import get_authority_for_category, get_doc_type_for_category, get_tone_for_category, get_authority_details
+from utils.helpers import get_authority_for_category, get_doc_type_for_category, get_tone_for_category, get_authority_details, get_step_guidance
 from services.ai_service import analyze_legal_issue, generate_complaint_draft
 from services.pdf_service import generate_pdf
 from services.email_service import send_email
@@ -164,115 +164,135 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
         st.markdown("### 🎯 Smart Authority Mapping")
         st.success(f"**{smart_authority['name']}**")
         
-        sa_col1, sa_col2 = st.columns(2)
-        with sa_col1:
-            st.markdown(f"**📧 Email:** `{smart_authority['email']}`")
-            st.link_button("🌐 Visit Official Website", smart_authority['website'], use_container_width=True)
-            
-        with sa_col2:
-            st.markdown("""
-            **Next Steps:**
-            1. Visit the official website
-            2. Submit your complaint online or via email
-            3. Save the reference number
-            """)
+        st.markdown(f"**📧 Email:** `{smart_authority['email']}`")
+        st.link_button("🌐 Visit Official Website", smart_authority['website'], use_container_width=True)
 
-    st.markdown(st.session_state.llm_response)
+
+    # ═══════════════════════════════════════════════════════════════
+    # STEP-BY-STEP GUIDANCE SECTION
+    # ═══════════════════════════════════════════════════════════════
+    
+    step_guide = get_step_guidance(category)
+    if step_guide:
+        st.markdown("---")
+        st.subheader("🧭 Step-by-Step Action Plan")
+        st.markdown(f"Follow these real-world steps for **{category}**:")
+        
+        for idx, (title, description) in enumerate(step_guide, 1):
+            st.markdown(f"**{idx}. {title}**\n\n{description}")
+
+    # ═══════════════════════════════════════════════════════════════
+    # COLLAPSIBLE EXPLANATION SECTION
+    # ═══════════════════════════════════════════════════════════════
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.expander("📘 Detailed Legal Explanation"):
+        st.markdown(st.session_state.llm_response)
 
     # ═══════════════════════════════════════════════════════════════
     # COMPLAINT GENERATOR SECTION
     # ═══════════════════════════════════════════════════════════════
 
     if category not in ["Not a Legal Issue", "Unknown Category"]:
-        default_type = get_doc_type_for_category(category)
-        default_auth = recommended_authority
-        default_tone = get_tone_for_category(category)
-
         st.markdown("---")
-        st.subheader("📄 Auto-Draft Formal Document")
-        st.markdown("Generate a meticulously formatted legal document ready for submission.")
-
-        with st.expander("📝 Personalize Document (Optional)", expanded=True):
-            st.markdown("Fill in the details below to automatically include them in your draft. Leave blank to keep placeholders.")
-
-            c_type_col1, c_type_col2 = st.columns(2)
-            with c_type_col1:
-                custom_doc_type = st.text_input("Complaint Type", value=default_type, help="E.g., FIR, Consumer Complaint, College Application")
-            with c_type_col2:
-                custom_authority = st.text_input("Addressing Authority (To:)", value=default_auth, help="You can override the auto-filled authority here.")
-
-            st.markdown("#### Core Details")
-            f_col1, f_col2 = st.columns(2)
-            with f_col1:
-                p_name = st.text_input("Full Name", placeholder="e.g. Rahul Sharma")
-                p_phone = st.text_input("Phone Number", placeholder="e.g. +91 9876543210")
-                p_email = st.text_input("Email Address", placeholder="e.g. rahul@example.com")
-            with f_col2:
-                p_age = st.text_input("Age", placeholder="e.g. 30")
-                p_date = st.date_input("Date", value=datetime.today())
-                p_address = st.text_area("Your Address", height=68, placeholder="e.g. 123, Main Street, Mumbai")
-
-            st.markdown("#### Case-Specific Details")
-            DYNAMIC_FIELDS = {
-                "Cybercrime": ["Transaction ID", "Amount Lost", "Platform (UPI, Bank, App, etc.)"],
-                "Fraud": ["Amount Lost", "Incident Location", "Date/Time of Incident"],
-                "Harassment (College)": ["Person Name (if known)", "Platform/Location (College, online, etc.)"],
-                "Harassment (General)": ["Person Name (if known)", "Platform/Location", "Frequency of Harassment"],
-                "Consumer Issues": ["Product/Service Name", "Company Name", "Amount Paid"],
-                "Banking / Financial Issues": ["Bank Name", "Account Number (Last 4 digits)", "Amount Disputed"],
-                "Workplace Complaints": ["Company Name", "Manager/HR/Perpetrator Name", "Duration of Issue"],
-                "Women Safety": ["Incident Location", "Date/Time of Incident", "Accused Details (if known)"]
-            }
+        st.header("📄 Generate Complaint")
+        
+        if "show_complaint_form" not in st.session_state:
+            st.session_state.show_complaint_form = False
             
-            fields_to_show = DYNAMIC_FIELDS.get(category, ["Incident Location", "Specific Details"])
-            
-            dynamic_inputs = {}
-            dyn_cols = st.columns(2)
-            for i, field in enumerate(fields_to_show):
-                with dyn_cols[i % 2]:
-                    dynamic_inputs[field] = st.text_input(field, key=f"dyn_{field}")
+        if not st.session_state.show_complaint_form:
+            if st.button("Generate Complaint", type="primary"):
+                st.session_state.show_complaint_form = True
+                st.rerun()
+                
+        if st.session_state.show_complaint_form:
+            default_type = get_doc_type_for_category(category)
+            default_auth = recommended_authority
+            default_tone = get_tone_for_category(category)
 
-        btn_col, empty_col2 = st.columns([1.5, 3.5])
-        with btn_col:
-            gen_btn = st.button("🖋️ Generate Draft", use_container_width=True)
+            st.markdown("Generate a meticulously formatted legal document ready for submission.")
 
-        if gen_btn:
-            with st.spinner(f"Drafting your {category} document..."):
-                # Build personal details string
-                personal_details = f"""
-                Name: {p_name.strip() if p_name.strip() else '[Your Name]'}
-                Age: {p_age.strip() if p_age.strip() else '[Your Age]'}
-                Address: {p_address.strip() if p_address.strip() else '[Your Address]'}
-                Phone Number: {p_phone.strip() if p_phone.strip() else '[Your Phone Number]'}
-                Email: {p_email.strip() if p_email.strip() else '[Your Email]'}
-                Date: {p_date.strftime('%d-%m-%Y')}
-                """
+            with st.expander("📝 Personalize Document (Optional)", expanded=True):
+                st.markdown("Fill in the details below to automatically include them in your draft. Leave blank to keep placeholders.")
 
-                severity_val = st.session_state.get("severity", "LOW")
-                if severity_val == "HIGH":
-                    tone_line = "This matter requires urgent attention and immediate action."
-                elif severity_val == "MEDIUM":
-                    tone_line = "This matter requires timely attention."
-                else:
-                    tone_line = "This matter is submitted for your consideration."
+                c_type_col1, c_type_col2 = st.columns(2)
+                with c_type_col1:
+                    custom_doc_type = st.text_input("Complaint Type", value=default_type, help="E.g., FIR, Consumer Complaint, College Application")
+                with c_type_col2:
+                    custom_authority = st.text_input("Addressing Authority (To:)", value=default_auth, help="You can override the auto-filled authority here.")
 
-                draft_result = generate_complaint_draft(
-                    category=category,
-                    custom_authority=custom_authority,
-                    custom_doc_type=custom_doc_type,
-                    default_tone=default_tone,
-                    severity_tone_line=tone_line,
-                    language=st.session_state.language,
-                    user_problem=st.session_state.user_problem,
-                    personal_details=personal_details,
-                    dynamic_fields=dynamic_inputs,
-                    groq_api_key=GROQ_API_KEY,
-                )
+                st.markdown("#### Core Details")
+                f_col1, f_col2 = st.columns(2)
+                with f_col1:
+                    p_name = st.text_input("Full Name", placeholder="e.g. Rahul Sharma")
+                    p_phone = st.text_input("Phone Number", placeholder="e.g. +91 9876543210")
+                    p_email = st.text_input("Email Address", placeholder="e.g. rahul@example.com")
+                with f_col2:
+                    p_age = st.text_input("Age", placeholder="e.g. 30")
+                    p_date = st.date_input("Date", value=datetime.today())
+                    p_address = st.text_area("Your Address", height=68, placeholder="e.g. 123, Main Street, Mumbai")
 
-                if draft_result["success"]:
-                    st.session_state.complaint_draft = draft_result["draft"]
-                else:
-                    st.error(draft_result["error"])
+                st.markdown("#### Case-Specific Details")
+                DYNAMIC_FIELDS = {
+                    "Cybercrime": ["Transaction ID", "Amount Lost", "Platform (UPI, Bank, App, etc.)"],
+                    "Fraud": ["Amount Lost", "Incident Location", "Date/Time of Incident"],
+                    "Harassment (College)": ["Person Name (if known)", "Platform/Location (College, online, etc.)"],
+                    "Harassment (General)": ["Person Name (if known)", "Platform/Location", "Frequency of Harassment"],
+                    "Consumer Issues": ["Product/Service Name", "Company Name", "Amount Paid"],
+                    "Banking / Financial Issues": ["Bank Name", "Account Number (Last 4 digits)", "Amount Disputed"],
+                    "Workplace Complaints": ["Company Name", "Manager/HR/Perpetrator Name", "Duration of Issue"],
+                    "Women Safety": ["Incident Location", "Date/Time of Incident", "Accused Details (if known)"]
+                }
+                
+                fields_to_show = DYNAMIC_FIELDS.get(category, ["Incident Location", "Specific Details"])
+                
+                dynamic_inputs = {}
+                dyn_cols = st.columns(2)
+                for i, field in enumerate(fields_to_show):
+                    with dyn_cols[i % 2]:
+                        dynamic_inputs[field] = st.text_input(field, key=f"dyn_{field}")
+
+                btn_col, empty_col2 = st.columns([1.5, 3.5])
+                with btn_col:
+                    gen_btn = st.button("🖋️ Generate Draft", use_container_width=True)
+
+                if gen_btn:
+                    with st.spinner(f"Drafting your {category} document..."):
+                        # Build personal details string
+                        personal_details = f"""
+                        Name: {p_name.strip() if p_name.strip() else '[Your Name]'}
+                        Age: {p_age.strip() if p_age.strip() else '[Your Age]'}
+                        Address: {p_address.strip() if p_address.strip() else '[Your Address]'}
+                        Phone Number: {p_phone.strip() if p_phone.strip() else '[Your Phone Number]'}
+                        Email: {p_email.strip() if p_email.strip() else '[Your Email]'}
+                        Date: {p_date.strftime('%d-%m-%Y')}
+                        """
+
+                        severity_val = st.session_state.get("severity", "LOW")
+                        if severity_val == "HIGH":
+                            tone_line = "This matter requires urgent attention and immediate action."
+                        elif severity_val == "MEDIUM":
+                            tone_line = "This matter requires timely attention."
+                        else:
+                            tone_line = "This matter is submitted for your consideration."
+
+                        draft_result = generate_complaint_draft(
+                            category=category,
+                            custom_authority=custom_authority,
+                            custom_doc_type=custom_doc_type,
+                            default_tone=default_tone,
+                            severity_tone_line=tone_line,
+                            language=st.session_state.language,
+                            user_problem=st.session_state.user_problem,
+                            personal_details=personal_details,
+                            dynamic_fields=dynamic_inputs,
+                            groq_api_key=GROQ_API_KEY,
+                        )
+
+                        if draft_result["success"]:
+                            st.session_state.complaint_draft = draft_result["draft"]
+                        else:
+                            st.error(draft_result["error"])
 
         # ═══════════════════════════════════════════════════════════════
         # DISPLAY — Draft, PDF Download & Email
