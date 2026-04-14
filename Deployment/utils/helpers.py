@@ -8,22 +8,38 @@ functions that retrieve authority, document type, and tone for a given category.
 from utils.constants import CATEGORY_AUTHORITY_MAP
 
 
-def keyword_detect_category(text: str) -> str:
-    """
-    Simple keyword-based fallback to detect category from user input text.
-    Counts how many keywords from each category appear in the text,
-    and returns the best-matching category name, or 'Other' if nothing matches.
-    """
-    text_lower = text.lower()
-    scores = {}
-    for cat, info in CATEGORY_AUTHORITY_MAP.items():
-        score = sum(1 for kw in info["keywords"] if kw in text_lower)
-        if score > 0:
-            scores[cat] = score
+from utils.constants import ALL_CATEGORIES
 
-    if scores:
-        return max(scores, key=scores.get)
-    return "Other"
+def validate_llm_json(parsed_json: dict) -> dict:
+    """
+    Validates the structured JSON parsed from the LLM.
+    Ensures safe fallbacks for UI consumption if the model hallucinates keys.
+    """
+    category = parsed_json.get("category", "")
+    if category not in ALL_CATEGORIES:
+        category = "Other"
+        
+    severity = str(parsed_json.get("severity", "LOW")).strip().upper()
+    if severity not in ["LOW", "MEDIUM", "HIGH"]:
+        severity = "LOW"
+        
+    confidence = parsed_json.get("confidence", 0.0)
+    try:
+        confidence = float(confidence)
+        if confidence < 0.0 or confidence > 1.0:
+            confidence = 0.5
+    except (ValueError, TypeError):
+        confidence = 0.5
+        
+    return {
+        "category": category,
+        "subcategory": str(parsed_json.get("subcategory", "None")),
+        "severity": severity,
+        "confidence": confidence,
+        "reason": str(parsed_json.get("reason", "No reason provided by AI.")),
+        "recommended_authority": str(parsed_json.get("recommended_authority", "")),
+        "response": str(parsed_json.get("response", ""))
+    }
 
 
 def get_authority_for_category(category: str) -> str:

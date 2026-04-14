@@ -108,6 +108,10 @@ if get_help_btn:
                 st.session_state.recommended_authority = result["recommended_authority"]
                 st.session_state.llm_response = result["response"]
                 st.session_state.user_problem = user_input
+                st.session_state.severity = result.get("severity", "LOW")
+                st.session_state.subcategory = result.get("subcategory", "None")
+                st.session_state.confidence = result.get("confidence", 0.0)
+                st.session_state.reason = result.get("reason", "No reason provided by AI.")
                 st.session_state.user_location = user_location
                 st.session_state.language = selected_language
                 st.session_state.complaint_draft = None  # Reset previous drafts
@@ -122,8 +126,25 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
     st.markdown("---")
     st.subheader("📊 Legal Analysis & Strategy")
     st.success("✅ Analysis Complete!")
-
+    
     category = st.session_state.category
+    subcategory = st.session_state.get("subcategory", "None")
+    severity = st.session_state.get("severity", "LOW")
+    confidence = st.session_state.get("confidence", 0.0)
+    reason = st.session_state.get("reason", "")
+    
+    if severity == "HIGH":
+        st.error("🚨 High Severity: Immediate action required")
+    elif severity == "MEDIUM":
+        st.warning("⚠️ Medium Severity: Action needed soon")
+    else:
+        st.info("ℹ️ Low Severity")
+        
+    st.markdown(f"**Severity Level:** {severity} (Confidence: {confidence:.0%})")
+    st.markdown(f"**Reason:** {reason}")
+    if subcategory and subcategory.lower() not in ["none", ""]:
+        st.markdown(f"**Subcategory:** {subcategory}")
+
     recommended_authority = st.session_state.get("recommended_authority", get_authority_for_category(category))
     stored_location = st.session_state.get("user_location", "")
     smart_authority = get_authority_details(category, stored_location)
@@ -227,11 +248,20 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
                 Date: {p_date.strftime('%d-%m-%Y')}
                 """
 
+                severity_val = st.session_state.get("severity", "LOW")
+                if severity_val == "HIGH":
+                    tone_line = "This matter requires urgent attention and immediate action."
+                elif severity_val == "MEDIUM":
+                    tone_line = "This matter requires timely attention."
+                else:
+                    tone_line = "This matter is submitted for your consideration."
+
                 draft_result = generate_complaint_draft(
                     category=category,
                     custom_authority=custom_authority,
                     custom_doc_type=custom_doc_type,
                     default_tone=default_tone,
+                    severity_tone_line=tone_line,
                     language=st.session_state.language,
                     user_problem=st.session_state.user_problem,
                     personal_details=personal_details,

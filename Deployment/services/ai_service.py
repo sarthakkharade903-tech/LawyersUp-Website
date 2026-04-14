@@ -12,7 +12,7 @@ import requests
 import json
 
 from utils.constants import ALL_CATEGORIES
-from utils.helpers import keyword_detect_category, get_authority_for_category
+from utils.helpers import get_authority_for_category, validate_llm_json
 
 
 # Groq API endpoint (OpenAI-compatible)
@@ -47,59 +47,54 @@ def analyze_legal_issue(user_input: str, selected_language: str, manual_category
         category_hint = f'\nIMPORTANT HINT: The user has pre-selected the category "{manual_category}". Use this as the category unless the problem clearly belongs to a different category.'
 
     prompt = f"""System Instructions:
-            You are a helpful and knowledgeable Indian Legal Assistant.
+            You are a highly intelligent Indian Legal Assistant extracting structured legal metadata.
             
             STEP 1 — CATEGORY DETECTION:
-            First, carefully analyze the user's problem and classify it into EXACTLY ONE of these categories:
-            {category_list_str}, "Other", or "Not a Legal Issue".
+            Carefully analyze the user's problem and classify it into EXACTLY ONE of these categories:
+            {category_list_str}, or "Not a Legal Issue".
             
-            Use context and keywords to determine the category. Here are examples:
-            - If user mentions college, professor, ragging, campus → "Harassment (College)"
-            - If user mentions office, HR, employer, salary → "Workplace Complaints"
-            - If user mentions bank, loan, UPI, credit card → "Banking / Financial Issues"
-            - If user mentions product, refund, e-commerce → "Consumer Issues"
-            - If user mentions hack, phishing, online fraud → "Cybercrime"
-            - If user mentions scam, forged documents → "Fraud"
-            - If user mentions dowry, domestic violence, eve teasing → "Women Safety"
-            - If user mentions RTI, government corruption, bribe → "Government / RTI Issues"
-            - If user mentions road, pothole, water, drainage, municipal → "Public / Municipal Issues"
-            - For general harassment/stalking/threats → "Harassment (General)"
+            Use meaning and intent to determine the category, not just keywords. Examples:
+            - Writing an application, request, email, permission → "Administrative / Requests"
+            - Asking what they should do, seeking legal advice, procedural inquiry → "Legal Guidance / Inquiry"
+            - Physical violence, theft, cybercrime, fraud, murder → "Criminal Issues" (Subcategories: Cyber Fraud, Assault, etc.)
+            - Abuse, stalking, bullying, domestic violence → "Harassment / Abuse"
+            - Defective product, refund, e-commerce issue → "Consumer Issues"
+            - HR issues, salary, termination, workplace bullying → "Workplace Issues"
+            - Potholes, garbage, sewage, streetlights → "Civic / Public Issues"
             
-            DO NOT default everything to one single category. Pick the MOST SPECIFIC match.
             {category_hint}
             
-            STEP 2 — AUTHORITY ASSIGNMENT:
-            Based on the detected category, assign the correct authority from this mapping:
-            - Cybercrime → Cyber Crime Cell / Police
-            - Fraud → Police / Cyber Cell
-            - Harassment (College) → Principal / College Authority
-            - Harassment (General) → Local Police Station
-            - Workplace Complaints → HR / Internal Complaints Committee (ICC)
-            - Women Safety → Police / Women Cell / National Commission for Women
-            - Consumer Issues → Consumer Forum / Company Support
-            - Government / RTI Issues → Concerned Government Department / PIO
-            - Banking / Financial Issues → Bank / RBI Ombudsman
-            - Public / Municipal Issues → Municipal Corporation
-            - Other → The Respective Authority
+            STEP 2 — SEVERITY DETECTION:
+            Define severity based on REAL impact:
+            - HIGH: Physical harm, threats to life/safety, serious fraud, repeated/escalating crime.
+            - MEDIUM: Harassment, consumer issues, civic problems affecting daily life, moderate urgency.
+            - LOW: General queries, writing emails, legal guidance without conflict, no immediate harm.
+            DO NOT overestimate severity. If no immediate harm, default to LOW. If unsure, default to MEDIUM.
             
-            STEP 3 — RESPONSE:
-            You MUST return your response as a strict JSON object with THREE keys:
-            1. "category": The detected category (one of the exact category names above).
-            2. "recommended_authority": The correct authority for this category.
-            3. "response": Your detailed response in markdown format. ALL TEXT IN THIS RESPONSE MUST BE IN {selected_language}.
+            STEP 3 — LLM RULES:
+            - DO NOT assume facts not provided.
+            - DO NOT invent people, actions, or events.
+            - Stick ONLY to user input. If unclear, set lower confidence.
+            - Keep reasoning short and factual.
             
-            If it is NOT a valid legal issue, set "category" to "Not a Legal Issue" and "recommended_authority" to "N/A". In "response", respectfully state (in {selected_language}) that as an Indian legal AI assistant, you need more details, and politely ask them to clarify.
-            
-            If it IS a valid legal issue, structure the "response" text into these three sections using clean markdown formatting (in {selected_language}):
-            
+            STEP 4 — RESPONSE MAPPING & RESPONSE TEXT:
+            Based on the detected category, assign the correct recommended authority.
+            Your "response" key output MUST be detailed markdown format IN {selected_language} answering the user:
             ### 1. Issue Understanding
-            Explain the user's issue in simple language so they know you understand their situation.
-            
             ### 2. Legal Explanation
-            Provide a simple legal explanation according to Indian law. Avoid complex legal jargon, and if any legal terms are necessary, explain them simply.
-            
             ### 3. What You Should Do Next
-            Give clear, actionable next steps for the user to solve their problem.
+            
+            STEP 5 — RESPONSE OUTPUT (STRICT JSON):
+            You MUST return your response as a strict JSON object with NO OTHER TEXT outside the JSON braces.
+            {{
+              "category": "exact match to the list above",
+              "subcategory": "short string preserving specific detail (e.g. Cyber Fraud, Leave Request)",
+              "severity": "LOW" | "MEDIUM" | "HIGH",
+              "confidence": 0.85,
+              "reason": "short explanation of severity and category mapping",
+              "recommended_authority": "authority name or 'N/A'",
+              "response": "Detailed markdown explanation in {selected_language}."
+            }}
             
             Problem: {user_input}
             """
@@ -121,45 +116,32 @@ def analyze_legal_issue(user_input: str, selected_language: str, manual_category
             try:
                 parsed_reply = json.loads(raw_reply)
 
-                ai_category = parsed_reply.get("category", "Unknown Category")
-                ai_authority = parsed_reply.get("recommended_authority", "")
-
-                # If the AI didn't return a valid category, try keyword fallback
-                if ai_category in ["Unknown Category", "Other", ""]:
-                    kw_cat = keyword_detect_category(user_input)
-                    if kw_cat != "Other":
-                        ai_category = kw_cat
-
+                validated_json = validate_llm_json(parsed_reply)
+                
                 # If user manually selected a category, prefer that
-                if manual_category != "Auto-Detect":
-                    final_category = manual_category
-                else:
-                    final_category = ai_category
-
+                final_category = manual_category if manual_category != "Auto-Detect" else validated_json["category"]
+                
                 # Set authority: use AI's if available, otherwise derive from mapping
-                if ai_authority and ai_authority != "N/A":
-                    final_authority = ai_authority
-                else:
+                final_authority = validated_json["recommended_authority"]
+                if not final_authority or final_authority == "N/A":
                     final_authority = get_authority_for_category(final_category)
 
                 return {
                     "success": True,
                     "category": final_category,
+                    "subcategory": validated_json["subcategory"],
+                    "severity": validated_json["severity"],
+                    "confidence": validated_json["confidence"],
+                    "reason": validated_json["reason"],
                     "recommended_authority": final_authority,
-                    "response": parsed_reply.get("response", raw_reply),
+                    "response": validated_json["response"] if validated_json["response"] else "Analysis completed but no advice provided.",
                     "error": None,
                 }
 
             except json.JSONDecodeError:
-                # Fallback: keyword-based detection
-                fallback_cat = keyword_detect_category(user_input)
-                final_cat = fallback_cat if manual_category == "Auto-Detect" else manual_category
                 return {
-                    "success": True,
-                    "category": final_cat,
-                    "recommended_authority": get_authority_for_category(final_cat),
-                    "response": raw_reply,
-                    "error": None,
+                    "success": False,
+                    "error": "The AI returned an invalid response structure.",
                 }
         else:
             return {"success": False, "error": "API returned an unexpected format."}
@@ -175,6 +157,7 @@ def generate_complaint_draft(
     custom_authority: str,
     custom_doc_type: str,
     default_tone: str,
+    severity_tone_line: str,
     language: str,
     user_problem: str,
     personal_details: str,
@@ -229,7 +212,7 @@ def generate_complaint_draft(
                    - Introduction (Who is complaining and against whom/what).
                    - Detailed Account of Incident (Chronological narrative based STRICTLY on the user's problem).
                    - Legal Grounds / Impact (The harm or consequences faced by the complainant).
-                   - Prayer/Relief Requested (Specific action demanded, such as an immediate investigation, refund, or disciplinary action).
+                   - Prayer/Relief Requested (Specific action demanded). You MUST naturally weave the following exact phrase into this section: "{severity_tone_line}"
                    
                 STRICT FACTUAL RULES:
                 - Do NOT add or assume any facts that are not explicitly mentioned in the input.
