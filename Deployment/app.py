@@ -1,7 +1,7 @@
 #TO RUN Locally --> streamlit run "Deployment\app.py"
 """To Deploy Updated --> 
 git add .
-git commit -m "Multilingual Upgrade"
+git commit -m "Case history Upgrade(no database)"
 git push
 """
 #This file handles ONLY the UI flow and orchestrates calls to service modules.
@@ -38,10 +38,116 @@ EMAIL_USER = st.secrets["EMAIL_USER"]
 EMAIL_PASS = st.secrets["EMAIL_PASS"]
 
 # ═══════════════════════════════════════════════════════════════
+# SESSION STATE INITIALIZATION
+# ═══════════════════════════════════════════════════════════════
+
+if "case_history" not in st.session_state:
+    st.session_state.case_history = []
+
+def save_to_history():
+    """Helper to save or update the current case in session state history."""
+    if "user_problem" not in st.session_state or not st.session_state.user_problem:
+        return
+        
+    case_data = {
+        "problem": st.session_state.user_problem,
+        "category": st.session_state.category,
+        "severity": st.session_state.severity,
+        "recommended_authority": st.session_state.recommended_authority,
+        "complaint": st.session_state.get("complaint_draft"),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        # Extra state for full reload
+        "llm_response": st.session_state.get("llm_response"),
+        "subcategory": st.session_state.get("subcategory"),
+        "confidence": st.session_state.get("confidence"),
+        "reason": st.session_state.get("reason"),
+        "step_plan": st.session_state.get("step_plan"),
+        "user_location": st.session_state.get("user_location"),
+        "language": st.session_state.get("language"),
+        "manual_category_saved": st.session_state.get("manual_category_input")
+    }
+    
+    # Update latest if it's the same problem during same active session
+    # or append as new if different.
+    found = False
+    if st.session_state.case_history:
+        # Check if the last case in history is the same problem (likely updating with complaint)
+        if st.session_state.case_history[-1]["problem"] == case_data["problem"]:
+            st.session_state.case_history[-1] = case_data
+            found = True
+            
+    if not found:
+        st.session_state.case_history.append(case_data)
+        # Limit to 10 cases
+        if len(st.session_state.case_history) > 10:
+            st.session_state.case_history.pop(0)
+
+# ═══════════════════════════════════════════════════════════════
 # SIDEBAR
 # ═══════════════════════════════════════════════════════════════
 
 selected_language = render_sidebar()
+
+# ═══════════════════════════════════════════════════════════════
+# SIDEBAR — CASE HISTORY (NEW)
+# ═══════════════════════════════════════════════════════════════
+
+with st.sidebar:
+    st.markdown("---")
+    st.subheader("📁 Case History")
+
+    if not st.session_state.case_history:
+        st.info("No cases saved yet. Your generated cases will appear here.")
+    else:
+        # Clear History button
+        if st.button("🗑️ Clear History", use_container_width=True):
+            st.session_state.case_history = []
+            st.rerun()
+
+        # Iterate through history (newest first)
+        for i, case in enumerate(reversed(st.session_state.case_history)):
+            # Problem preview text
+            preview = case["problem"][:50] + "..." if len(case["problem"]) > 50 else case["problem"]
+            
+            with st.expander(f"📌 {preview}"):
+                st.markdown(f"**Category:** {case['category']}")
+                st.markdown(f"**Severity:** {case['severity']}")
+                st.markdown(f"**Date:** {case['timestamp']}")
+
+                # Load Case Button
+                if st.button("🔄 Load Case", key=f"load_btn_{i}", use_container_width=True):
+                    # Restore Result UI state
+                    st.session_state.user_problem = case["problem"]
+                    st.session_state.category = case["category"]
+                    st.session_state.severity = case["severity"]
+                    st.session_state.recommended_authority = case["recommended_authority"]
+                    st.session_state.complaint_draft = case["complaint"]
+                    st.session_state.llm_response = case.get("llm_response")
+                    st.session_state.subcategory = case.get("subcategory")
+                    st.session_state.confidence = case.get("confidence", 0.0)
+                    st.session_state.reason = case.get("reason")
+                    st.session_state.step_plan = case.get("step_plan")
+                    st.session_state.user_location = case.get("user_location", "")
+                    st.session_state.language = case.get("language", "English")
+                    
+                    # Restore Input Widget state
+                    st.session_state.user_problem_input = case["problem"]
+                    st.session_state.user_location_input = case.get("user_location", "")
+                    if "manual_category_saved" in case:
+                        st.session_state.manual_category_input = case["manual_category_saved"]
+                    
+                    st.rerun()
+
+                # Download Complaint Button (if available)
+                if case.get("complaint"):
+                    st.download_button(
+                        label="📥 Download Complaint",
+                        data=case["complaint"],
+                        file_name=f"legal_complaint_{i+1}.txt",
+                        mime="text/plain",
+                        key=f"dl_btn_{i}",
+                        use_container_width=True
+                    )
 
 # Helper shortcut for UI text
 def t(key):
@@ -61,6 +167,7 @@ with cat_col1:
         t("select_category"),
         [t("auto_detect")] + ALL_CATEGORIES,
         help=t("select_category"),
+        key="manual_category_input"
     )
 with cat_col2:
     # Normalize auto-detect check for all languages
@@ -86,13 +193,15 @@ user_input = st.text_area(
     t("enter_problem"),
     height=150,
     placeholder="E.g., I was defrauded of money online by a fake e-commerce website...",
+    key="user_problem_input"
 )
 
 # User location input
 user_location = st.text_input(
     t("enter_location"),
     placeholder=t("location_placeholder"),
-    help=t("enter_location")
+    help=t("enter_location"),
+    key="user_location_input"
 )
 
 col1, col2 = st.columns([1, 4])
@@ -129,6 +238,9 @@ if get_help_btn:
                 st.session_state.language = selected_language
                 st.session_state.complaint_draft = None  # Reset previous drafts
                 st.session_state.show_complaint_form = False
+                
+                # Save to history after successful analysis
+                save_to_history()
             else:
                 st.error(result["error"])
 
@@ -320,6 +432,8 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
 
                         if draft_result["success"]:
                             st.session_state.complaint_draft = draft_result["draft"]
+                            # Update history with the complaint draft
+                            save_to_history()
                         else:
                             st.error(draft_result["error"])
 
