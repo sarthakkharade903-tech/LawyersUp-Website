@@ -1,7 +1,7 @@
 #TO RUN Locally --> streamlit run "Deployment\app.py"
 """To Deploy Updated --> 
 git add .
-git commit -m "Step-by-Step Guidance"
+git commit -m "Multilingual Upgrade"
 git push
 """
 #This file handles ONLY the UI flow and orchestrates calls to service modules.
@@ -19,7 +19,11 @@ from dotenv import load_dotenv
 # Import our modules
 from components.ui_components import render_sidebar, render_footer
 from utils.constants import ALL_CATEGORIES
-from utils.helpers import get_authority_for_category, get_doc_type_for_category, get_tone_for_category, get_authority_details, get_step_guidance
+from utils.helpers import (
+    get_authority_for_category, get_doc_type_for_category,
+    get_tone_for_category, get_authority_details,
+    get_step_guidance, get_ui_text
+)
 from services.ai_service import analyze_legal_issue, generate_complaint_draft
 from services.pdf_service import generate_pdf
 from services.email_service import send_email
@@ -39,56 +43,61 @@ EMAIL_PASS = st.secrets["EMAIL_PASS"]
 
 selected_language = render_sidebar()
 
+# Helper shortcut for UI text
+def t(key):
+    return get_ui_text(selected_language, key)
+
 # ═══════════════════════════════════════════════════════════════
 # MAIN UI — Input Section
 # ═══════════════════════════════════════════════════════════════
 
-st.title("🏛️ Lawyer's Up : Legal AI Assistant")
-st.markdown("Describe your issue below to instantly receive professional legal guidance. 🚀")
+st.title(t("app_title"))
+st.markdown(t("app_subtitle"))
 
 # Category selector dropdown
 cat_col1, cat_col2 = st.columns([1.5, 3.5])
 with cat_col1:
     manual_category = st.selectbox(
-        "📂 Select Complaint Category",
-        ["Auto-Detect"] + ALL_CATEGORIES,
-        help="Choose a category or let AI auto-detect from your description.",
+        t("select_category"),
+        [t("auto_detect")] + ALL_CATEGORIES,
+        help=t("select_category"),
     )
 with cat_col2:
-    # Show auto-filled authority based on category selection
-    if manual_category != "Auto-Detect":
+    # Normalize auto-detect check for all languages
+    is_auto = manual_category in [t("auto_detect"), "Auto-Detect", "स्वचालित पहचान", "स्वयंचलित ओळख"]
+    if not is_auto:
         auto_authority = get_authority_for_category(manual_category)
         st.text_input(
-            "🏢 Recommended Authority (auto-filled)",
+            t("recommended_authority_label"),
             value=auto_authority,
             disabled=True,
-            help="This authority is auto-filled based on your selected category.",
+            help=t("recommended_authority_label"),
         )
     else:
         st.text_input(
-            "🏢 Recommended Authority",
-            value="Will be detected from your description",
+            t("recommended_authority"),
+            value=t("recommended_authority_placeholder"),
             disabled=True,
-            help="Select a category or let AI determine the appropriate authority.",
+            help=t("recommended_authority"),
         )
 
 # User input text area
 user_input = st.text_area(
-    "✍️ **Enter your problem:**",
+    t("enter_problem"),
     height=150,
     placeholder="E.g., I was defrauded of money online by a fake e-commerce website...",
 )
 
 # User location input
 user_location = st.text_input(
-    "📍 **Your Location (City):**",
-    placeholder="E.g., Pune, Mumbai (Helps us find the exact authority)",
-    help="We use this to fetch regional contact information."
+    t("enter_location"),
+    placeholder=t("location_placeholder"),
+    help=t("enter_location")
 )
 
 col1, col2 = st.columns([1, 4])
 with col1:
-    get_help_btn = st.button("✨ Get Legal Help", use_container_width=True)
+    get_help_btn = st.button(t("get_help_btn"), use_container_width=True)
 
 # ═══════════════════════════════════════════════════════════════
 # HANDLE "Get Legal Help" BUTTON
@@ -100,8 +109,11 @@ if get_help_btn:
     elif not GROQ_API_KEY:
         st.error("GROQ_API_KEY is missing. Please ensure it is set in your .env file.")
     else:
-        with st.spinner("Analyzing your issue..."):
-            result = analyze_legal_issue(user_input, selected_language, manual_category, GROQ_API_KEY)
+        # Normalize manual_category back to English for backend
+        api_category = manual_category if not is_auto else "Auto-Detect"
+        
+        with st.spinner(t("analyzing")):
+            result = analyze_legal_issue(user_input, selected_language, api_category, GROQ_API_KEY, user_location)
 
             if result["success"]:
                 st.session_state.category = result["category"]
@@ -111,10 +123,12 @@ if get_help_btn:
                 st.session_state.severity = result.get("severity", "LOW")
                 st.session_state.subcategory = result.get("subcategory", "None")
                 st.session_state.confidence = result.get("confidence", 0.0)
-                st.session_state.reason = result.get("reason", "No reason provided by AI.")
+                st.session_state.reason = result.get("reason", "")
+                st.session_state.step_plan = result.get("step_by_step_plan", [])
                 st.session_state.user_location = user_location
                 st.session_state.language = selected_language
                 st.session_state.complaint_draft = None  # Reset previous drafts
+                st.session_state.show_complaint_form = False
             else:
                 st.error(result["error"])
 
@@ -123,9 +137,14 @@ if get_help_btn:
 # ═══════════════════════════════════════════════════════════════
 
 if "llm_response" in st.session_state and st.session_state.llm_response:
+    # Use stored language for display consistency
+    lang = st.session_state.get("language", "English")
+    def tl(key):
+        return get_ui_text(lang, key)
+    
     st.markdown("---")
-    st.subheader("📊 Legal Analysis & Strategy")
-    st.success("✅ Analysis Complete!")
+    st.subheader(tl("analysis_header"))
+    st.success(tl("analysis_complete"))
     
     category = st.session_state.category
     subcategory = st.session_state.get("subcategory", "None")
@@ -134,16 +153,16 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
     reason = st.session_state.get("reason", "")
     
     if severity == "HIGH":
-        st.error("🚨 High Severity: Immediate action required")
+        st.error(tl("severity_high"))
     elif severity == "MEDIUM":
-        st.warning("⚠️ Medium Severity: Action needed soon")
+        st.warning(tl("severity_medium"))
     else:
-        st.info("ℹ️ Low Severity")
+        st.info(tl("severity_low"))
         
-    st.markdown(f"**Severity Level:** {severity} (Confidence: {confidence:.0%})")
-    st.markdown(f"**Reason:** {reason}")
+    st.markdown(f"**{tl('severity_label')}:** {severity} ({tl('confidence_label')}: {confidence:.0%})")
+    st.markdown(f"**{tl('reason_label')}:** {reason}")
     if subcategory and subcategory.lower() not in ["none", ""]:
-        st.markdown(f"**Subcategory:** {subcategory}")
+        st.markdown(f"**{tl('subcategory_label')}:** {subcategory}")
 
     recommended_authority = st.session_state.get("recommended_authority", get_authority_for_category(category))
     stored_location = st.session_state.get("user_location", "")
@@ -152,33 +171,43 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
     cat_col, auth_col = st.columns([1.5, 3.5])
     with cat_col:
         if category not in ["Not a Legal Issue", "Unknown Category"]:
-            st.success(f"📌 **Detected Category:** {category}")
+            st.success(f"**{tl('detected_category')}:** {category}")
         else:
-            st.warning(f"⚠️ **Detected Category:** {category}")
+            st.warning(f"⚠️ **{tl('detected_category')}:** {category}")
     with auth_col:
         if category not in ["Not a Legal Issue", "Unknown Category"]:
-            st.info(f"🏢 **Recommended Authority:** {recommended_authority}")
+            st.info(f"**{tl('recommended_authority')}:** {recommended_authority}")
 
     if smart_authority:
         st.markdown("---")
-        st.markdown("### 🎯 Smart Authority Mapping")
+        st.markdown(f"### {tl('smart_authority_header')}")
         st.success(f"**{smart_authority['name']}**")
         
-        st.markdown(f"**📧 Email:** `{smart_authority['email']}`")
-        st.link_button("🌐 Visit Official Website", smart_authority['website'], use_container_width=True)
-
+        st.markdown(f"**{tl('email_label')}:** `{smart_authority['email']}`")
+        st.link_button(tl("visit_website"), smart_authority['website'], use_container_width=True)
 
     # ═══════════════════════════════════════════════════════════════
-    # STEP-BY-STEP GUIDANCE SECTION
+    # STEP-BY-STEP GUIDANCE SECTION (LLM-generated localized steps)
     # ═══════════════════════════════════════════════════════════════
     
-    step_guide = get_step_guidance(category)
-    if step_guide:
+    # Use LLM-generated localized steps first, fallback to static English steps
+    llm_steps = st.session_state.get("step_plan", [])
+    static_steps = get_step_guidance(category)
+    
+    if llm_steps:
         st.markdown("---")
-        st.subheader("🧭 Step-by-Step Action Plan")
-        st.markdown(f"Follow these real-world steps for **{category}**:")
+        st.subheader(tl("action_plan_header"))
+        st.markdown(f"{tl('action_plan_subtitle')} **{category}**:")
         
-        for idx, (title, description) in enumerate(step_guide, 1):
+        for idx, step in enumerate(llm_steps, 1):
+            st.markdown(f"**{idx}. {step['title']}**\n\n{step['description']}")
+    elif static_steps:
+        # Fallback: use English static steps if LLM didn't return any
+        st.markdown("---")
+        st.subheader(tl("action_plan_header"))
+        st.markdown(f"{tl('action_plan_subtitle')} **{category}**:")
+        
+        for idx, (title, description) in enumerate(static_steps, 1):
             st.markdown(f"**{idx}. {title}**\n\n{description}")
 
     # ═══════════════════════════════════════════════════════════════
@@ -186,7 +215,7 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
     # ═══════════════════════════════════════════════════════════════
     
     st.markdown("<br>", unsafe_allow_html=True)
-    with st.expander("📘 Detailed Legal Explanation"):
+    with st.expander(tl("legal_explanation_header")):
         st.markdown(st.session_state.llm_response)
 
     # ═══════════════════════════════════════════════════════════════
@@ -195,13 +224,13 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
 
     if category not in ["Not a Legal Issue", "Unknown Category"]:
         st.markdown("---")
-        st.header("📄 Generate Complaint")
+        st.header(tl("generate_complaint_header"))
         
         if "show_complaint_form" not in st.session_state:
             st.session_state.show_complaint_form = False
             
         if not st.session_state.show_complaint_form:
-            if st.button("Generate Complaint", type="primary"):
+            if st.button(tl("generate_complaint_btn"), type="primary"):
                 st.session_state.show_complaint_form = True
                 st.rerun()
                 
@@ -210,29 +239,29 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
             default_auth = recommended_authority
             default_tone = get_tone_for_category(category)
 
-            st.markdown("Generate a meticulously formatted legal document ready for submission.")
+            st.markdown(tl("draft_subtitle"))
 
-            with st.expander("📝 Personalize Document (Optional)", expanded=True):
-                st.markdown("Fill in the details below to automatically include them in your draft. Leave blank to keep placeholders.")
+            with st.expander(tl("personalize_header"), expanded=True):
+                st.markdown(tl("personalize_hint"))
 
                 c_type_col1, c_type_col2 = st.columns(2)
                 with c_type_col1:
-                    custom_doc_type = st.text_input("Complaint Type", value=default_type, help="E.g., FIR, Consumer Complaint, College Application")
+                    custom_doc_type = st.text_input(tl("complaint_type"), value=default_type)
                 with c_type_col2:
-                    custom_authority = st.text_input("Addressing Authority (To:)", value=default_auth, help="You can override the auto-filled authority here.")
+                    custom_authority = st.text_input(tl("addressing_authority"), value=default_auth)
 
-                st.markdown("#### Core Details")
+                st.markdown(f"#### {tl('core_details')}")
                 f_col1, f_col2 = st.columns(2)
                 with f_col1:
-                    p_name = st.text_input("Full Name", placeholder="e.g. Rahul Sharma")
-                    p_phone = st.text_input("Phone Number", placeholder="e.g. +91 9876543210")
-                    p_email = st.text_input("Email Address", placeholder="e.g. rahul@example.com")
+                    p_name = st.text_input(tl("full_name"), placeholder="e.g. Rahul Sharma")
+                    p_phone = st.text_input(tl("phone"), placeholder="e.g. +91 9876543210")
+                    p_email = st.text_input(tl("email_address"), placeholder="e.g. rahul@example.com")
                 with f_col2:
-                    p_age = st.text_input("Age", placeholder="e.g. 30")
-                    p_date = st.date_input("Date", value=datetime.today())
-                    p_address = st.text_area("Your Address", height=68, placeholder="e.g. 123, Main Street, Mumbai")
+                    p_age = st.text_input(tl("age"), placeholder="e.g. 30")
+                    p_date = st.date_input(tl("date"), value=datetime.today())
+                    p_address = st.text_area(tl("address"), height=68, placeholder="e.g. 123, Main Street, Mumbai")
 
-                st.markdown("#### Case-Specific Details")
+                st.markdown(f"#### {tl('case_specific')}")
                 DYNAMIC_FIELDS = {
                     "Cybercrime": ["Transaction ID", "Amount Lost", "Platform (UPI, Bank, App, etc.)"],
                     "Fraud": ["Amount Lost", "Incident Location", "Date/Time of Incident"],
@@ -254,10 +283,10 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
 
                 btn_col, empty_col2 = st.columns([1.5, 3.5])
                 with btn_col:
-                    gen_btn = st.button("🖋️ Generate Draft", use_container_width=True)
+                    gen_btn = st.button(tl("generate_draft_btn"), use_container_width=True)
 
                 if gen_btn:
-                    with st.spinner(f"Drafting your {category} document..."):
+                    with st.spinner(tl("drafting")):
                         # Build personal details string
                         personal_details = f"""
                         Name: {p_name.strip() if p_name.strip() else '[Your Name]'}
@@ -270,11 +299,11 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
 
                         severity_val = st.session_state.get("severity", "LOW")
                         if severity_val == "HIGH":
-                            tone_line = "This matter requires urgent attention and immediate action."
+                            tone_line = tl("tone_high")
                         elif severity_val == "MEDIUM":
-                            tone_line = "This matter requires timely attention."
+                            tone_line = tl("tone_medium")
                         else:
-                            tone_line = "This matter is submitted for your consideration."
+                            tone_line = tl("tone_low")
 
                         draft_result = generate_complaint_draft(
                             category=category,
@@ -299,16 +328,16 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
         # ═══════════════════════════════════════════════════════════════
 
         if st.session_state.get("complaint_draft"):
-            st.success("✨ Draft generated successfully!")
+            st.success(tl("draft_success"))
 
             col_header, col_copy = st.columns([5, 1])
             with col_header:
-                st.markdown("### Step 1: Review Your Complaint")
-                st.caption("Review your draft below. Use the copy button in the top-right of the box.")
+                st.markdown(f"### {tl('review_complaint')}")
+                st.caption(tl("review_hint"))
             with col_copy:
                 st.write("")  # Spacing alignment
-                if st.button("📋 Copy Text", use_container_width=True):
-                    st.toast("Copied to clipboard ✅")
+                if st.button(tl("copy_text"), use_container_width=True):
+                    st.toast("✅")
 
             # Using st.code() which provides a stable built-in copy button
             st.code(st.session_state.complaint_draft, language="text", wrap_lines=True)
@@ -318,7 +347,7 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
             # PDF Download
             pdf_buffer = generate_pdf(st.session_state.complaint_draft)
             st.download_button(
-                label="📥 Download as PDF",
+                label=tl("download_pdf"),
                 data=pdf_buffer,
                 file_name="legal_complaint_draft.pdf",
                 mime="application/pdf",
@@ -328,30 +357,30 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
             st.divider()
 
             # Email Section
-            st.markdown("### Step 2: Send Complaint via Email")
-            st.caption("Enter authority email (police, principal, company, etc.)")
+            st.markdown(f"### {tl('send_email_header')}")
+            st.caption(tl("send_email_hint"))
 
             default_email = smart_authority["email"] if smart_authority and "email" in smart_authority else ""
 
             if default_email:
-                st.success("✅ Email auto-filled based on authority")
-                use_custom_email = st.checkbox("Override automatically detected email")
+                st.success(tl("email_autofilled"))
+                use_custom_email = st.checkbox(tl("email_override"))
                 recipient_email = st.text_input(
-                    "Recipient Email Address", 
+                    tl("recipient_email"), 
                     value=default_email, 
                     disabled=not use_custom_email
                 )
             else:
-                st.warning("⚠️ Email not available, please enter manually")
+                st.warning("⚠️ Email not available")
                 recipient_email = st.text_input(
-                    "Recipient Email Address", 
+                    tl("recipient_email"), 
                     placeholder="e.g. support@company.com"
                 )
 
-            subject = st.text_input("Email Subject", value="Official Legal Complaint Draft")
+            subject = st.text_input(tl("email_subject"), value=tl("email_subject_default"))
 
             st.markdown("<br>", unsafe_allow_html=True)
-            send_email_clicked = st.button("🚀 Send Complaint via Email", type="primary", use_container_width=True)
+            send_email_clicked = st.button(tl("send_email_btn"), type="primary", use_container_width=True)
 
             if send_email_clicked:
                 if not EMAIL_USER or not EMAIL_PASS:
