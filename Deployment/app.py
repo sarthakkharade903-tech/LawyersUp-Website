@@ -1,7 +1,7 @@
 #TO RUN Locally --> streamlit run "Deployment\app.py"
 """To Deploy Updated --> 
 git add .
-git commit -m "Case followup button(no database)"
+git commit -m "Case followup button 1.0"
 git push
 """
 #This file handles ONLY the UI flow and orchestrates calls to service modules.
