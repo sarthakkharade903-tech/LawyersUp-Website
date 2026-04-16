@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 # Import our modules
 from components.ui_components import render_sidebar, render_footer
-from utils.constants import ALL_CATEGORIES
+from utils.constants import ALL_CATEGORIES, PORTAL_LINKS
 from utils.helpers import (
     get_authority_for_category, get_doc_type_for_category,
     get_tone_for_category, get_authority_details,
@@ -358,6 +358,9 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
     with st.expander(tl("legal_explanation_header")):
         st.markdown(st.session_state.llm_response)
 
+
+
+
     # ═══════════════════════════════════════════════════════════════
     # COMPLAINT GENERATOR SECTION
     # ═══════════════════════════════════════════════════════════════
@@ -539,6 +542,18 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
                             st.success("Email sent successfully! ✅")
                         else:
                             st.error(f"Failed to send email: {error_msg}")
+
+            # ═══════════════════════════════════════════════════════════════
+            # TAKE ACTION SECTION (Simplified & Repositioned)
+            # ═══════════════════════════════════════════════════════════════
+            portal = PORTAL_LINKS.get(category)
+            if portal:
+                st.markdown(f"**{tl('take_action_header')}**")
+                st.markdown(f"{tl('recommended_portal')}: **{portal['name']}**")
+                st.link_button(tl("file_complaint_btn"), portal["url"])
+                st.caption(tl("portal_helper_text"))
+            else:
+                st.caption(tl("no_portal_warning"))
 
     # ═══════════════════════════════════════════════════════════════
     # FOLLOW-UP / CONTINUE CASE SECTION (Enhanced & Repositioned)

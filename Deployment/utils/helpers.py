@@ -79,6 +79,11 @@ UI_TRANSLATIONS = {
         "generate_followup_btn": "Get Next Steps",
         "followup_header": "🔄 Follow-up Guidance",
         "followup_thinking": "Analyzing your update...",
+        "take_action_header": "📤 File Complaint Online",
+        "recommended_portal": "Recommended",
+        "file_complaint_btn": "Open Official Portal →",
+        "portal_helper_text": "Copy your complaint and paste it on the official portal",
+        "no_portal_warning": "No official portal available. Please contact relevant authority directly.",
     },
     "Hindi": {
         "app_title": "🏛️ लॉयर्स अप : AI कानूनी सहायक",
@@ -149,6 +154,11 @@ UI_TRANSLATIONS = {
         "generate_followup_btn": "अगले कदम प्राप्त करें",
         "followup_header": "🔄 फॉलो-अप मार्गदर्शन",
         "followup_thinking": "आपके अपडेट का विश्लेषण हो रहा है...",
+        "take_action_header": "📤 ऑनलाइन शिकायत दर्ज करें",
+        "recommended_portal": "अनुशंसित",
+        "file_complaint_btn": "आधिकारिक पोर्टल खोलें →",
+        "portal_helper_text": "अपनी शिकायत कॉपी करें और इसे आधिकारिक पोर्टल पर पेस्ट करें",
+        "no_portal_warning": "कोई आधिकारिक पोर्टल उपलब्ध नहीं है। कृपया संबंधित प्राधिकरण से सीधे संपर्क करें।",
     },
     "Marathi": {
         "app_title": "🏛️ लॉयर्स अप : AI कायदेशीर सहाय्यक",
@@ -218,6 +228,11 @@ UI_TRANSLATIONS = {
         "generate_followup_btn": "पुढील पायऱ्या मिळवा",
         "followup_header": "🔄 फॉलो-अप मार्गदर्शन",
         "followup_thinking": "तुमच्या अपडेटचे विश्लेषण सुरू आहे...",
+        "take_action_header": "📤 ऑनलाइन तक्रार नोंदवा",
+        "recommended_portal": "शिफारस केलेले",
+        "file_complaint_btn": "अधिकृत पोर्टल उघडा →",
+        "portal_helper_text": "तुमची तक्रार कॉपी करा आणि अधिकृत पोर्टलवर पेस्ट करा",
+        "no_portal_warning": "कोणतेही अधिकृत पोर्टल उपलब्ध नाही. कृपया संबंधित प्राधिकरणाशी थेट संपर्क साधा.",
     }
 }
 

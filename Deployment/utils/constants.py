@@ -77,5 +77,52 @@ CATEGORY_AUTHORITY_MAP = {
     },
 }
 
+# ═══════════════════════════════════════════════════════════════
+# OFFICIAL GOVERNMENT PORTAL LINKS
+# ═══════════════════════════════════════════════════════════════
+
+PORTAL_LINKS = {
+    "Consumer Issues": {
+        "name": "National Consumer Helpline (NCH)",
+        "url": "https://consumerhelpline.gov.in"
+    },
+    "Cybercrime": {
+        "name": "National Cyber Crime Portal",
+        "url": "https://cybercrime.gov.in"
+    },
+    "Fraud": {
+        "name": "National Cyber Crime Portal",
+        "url": "https://cybercrime.gov.in"
+    },
+    "Workplace Complaints": {
+        "name": "Labour Complaint Portal",
+        "url": "https://labour.gov.in"
+    },
+    "Harassment (General)": {
+        "name": "National Commission for Women (NCW)",
+        "url": "https://www.ncw.nic.in"
+    },
+    "Harassment (College)": {
+        "name": "National Commission for Women (NCW)",
+        "url": "https://www.ncw.nic.in"
+    },
+    "Women Safety": {
+        "name": "National Commission for Women (NCW)",
+        "url": "https://www.ncw.nic.in"
+    },
+    "Public / Municipal Issues": {
+        "name": "Public Grievance Portal (PG Portal)",
+        "url": "https://pgportal.gov.in"
+    },
+    "Government / RTI Issues": {
+        "name": "RTI Online Portal",
+        "url": "https://rtionline.gov.in"
+    },
+    "Banking / Financial Issues": {
+        "name": "RBI Ombudsman Online (CMS)",
+        "url": "https://cms.rbi.org.in"
+    }
+}
+
 # A flat list of category names for use in dropdowns
 ALL_CATEGORIES = list(CATEGORY_AUTHORITY_MAP.keys())
