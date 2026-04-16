@@ -341,3 +341,105 @@ def generate_complaint_draft(
 
     except Exception as e:
         return {"success": False, "draft": None, "error": f"Drafting error: {e}"}
+
+
+def generate_followup(case_data: dict, user_followup: str, language: str, groq_api_key: str) -> dict:
+    """
+    Generate next-level legal guidance (escalation/alternatives) based on what happened 
+    after the initial steps were followed.
+
+    Args:
+        case_data: Dict containing 'problem', 'category', 'severity', 'steps'.
+        user_followup: User's description of what happened next.
+        language: Selected language (English/Hindi/Marathi).
+        groq_api_key: Groq API key.
+
+    Returns:
+        A dict with keys: "success", "explanation", "next_steps", "error"
+    """
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    # Format previous steps for context
+    prev_steps_str = ""
+    for idx, step in enumerate(case_data.get("steps", []), 1):
+        prev_steps_str += f"{idx}. {step.get('title')}: {step.get('description')}\n"
+
+    lang_instruction = ""
+    if language != "English":
+        lang_instruction = f"""
+            CRITICAL LANGUAGE RULE: 
+            Output ONLY in {language}. Use natural, human-like phrasing.
+            Keep official legal terms (FIR, RTI, Consumer Forum, etc.) in English.
+            """
+    else:
+        lang_instruction = "LANGUAGE: Professional English."
+
+    prompt = f"""
+            System Instructions:
+            You are a senior Indian Legal Assistant specializing in case escalation and follow-up guidance.
+            The user has already received initial advice and is now reporting a follow-up situation.
+            
+            {lang_instruction}
+            
+            PREVIOUS CASE CONTEXT:
+            - Original Problem: {case_data.get('problem')}
+            - Category: {case_data.get('category')}
+            - Severity: {case_data.get('severity')}
+            
+            PREVIOUS STEPS PROVIDED:
+            {prev_steps_str}
+            
+            USER'S FOLLOW-UP UPDATE:
+            "{user_followup}"
+            
+            STRICT RULES:
+            1. DO NOT repeat the original steps provided above. 
+            2. PROVIDE next-level guidance, escalation paths, or alternative legal solutions.
+            3. Assume the user has attempted the primary steps and they were either ignored, rejected, or insufficient.
+            4. Keep the tone professional, practical, and action-oriented.
+            5. Return the response as a JSON object.
+            
+            OUTPUT JSON STRUCTURE:
+            {{
+                "explanation": "A short (2-3 sentences) explanation of why these next steps are necessary based on the follow-up.",
+                "next_steps": [
+                    "Step 1: Actionable escalation step",
+                    "Step 2: Another actionable step",
+                    ...
+                ]
+            }}
+            
+            Problem: {case_data.get('problem')}
+            Update: {user_followup}
+            """
+
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.5,
+        "response_format": {"type": "json_object"},
+    }
+
+    try:
+        response = requests.post(GROQ_API_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        result = response.json()
+
+        if "choices" in result and len(result["choices"]) > 0:
+            raw_reply = result["choices"][0]["message"]["content"]
+            parsed_reply = json.loads(raw_reply)
+            
+            return {
+                "success": True,
+                "explanation": parsed_reply.get("explanation", ""),
+                "next_steps": parsed_reply.get("next_steps", []),
+                "error": None
+            }
+        else:
+            return {"success": False, "error": "AI failed to generate follow-up."}
+
+    except Exception as e:
+        return {"success": False, "error": f"Follow-up Error: {e}"}

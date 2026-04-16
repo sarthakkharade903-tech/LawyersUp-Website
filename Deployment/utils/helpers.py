@@ -72,6 +72,13 @@ UI_TRANSLATIONS = {
         "tone_high": "This matter requires urgent attention and immediate action.",
         "tone_medium": "This matter requires timely attention.",
         "tone_low": "This matter is submitted for your consideration.",
+        "continue_case_btn": "➡️ What happened next?",
+        "continue_case_hint": "Tell us what happened after your last step, and we’ll guide you further.",
+        "followup_input_label": "What happened after your last step?",
+        "followup_placeholder": "e.g. no response from company, complaint rejected, etc.",
+        "generate_followup_btn": "Get Next Steps",
+        "followup_header": "🔄 Follow-up Guidance",
+        "followup_thinking": "Analyzing your update...",
     },
     "Hindi": {
         "app_title": "🏛️ लॉयर्स अप : AI कानूनी सहायक",
@@ -134,7 +141,14 @@ UI_TRANSLATIONS = {
         "send_email_btn": "🚀 ईमेल द्वारा शिकायत भेजें",
         "tone_high": "इस मामले में तत्काल ध्यान और कार्रवाई आवश्यक है।",
         "tone_medium": "इस मामले में समय पर ध्यान देने की आवश्यकता है।",
-        "tone_low": "यह मामला आपके विचारार्थ प्रस्तुत किया जाता है।",
+        "tone_low": "यह मामला आपके विचारार्थ प्रस्तुत किया जाता है.",
+        "continue_case_btn": "➡️ आगे क्या हुआ?",
+        "continue_case_hint": "हमें बताएं कि आपके पिछले कदम के बाद क्या हुआ, और हम आपका आगे मार्गदर्शन करेंगे।",
+        "followup_input_label": "आपके पिछले चरण के बाद क्या हुआ?",
+        "followup_placeholder": "उदा. कंपनी से कोई जवाब नहीं मिला, शिकायत खारिज कर दी गई, आदि।",
+        "generate_followup_btn": "अगले कदम प्राप्त करें",
+        "followup_header": "🔄 फॉलो-अप मार्गदर्शन",
+        "followup_thinking": "आपके अपडेट का विश्लेषण हो रहा है...",
     },
     "Marathi": {
         "app_title": "🏛️ लॉयर्स अप : AI कायदेशीर सहाय्यक",
@@ -198,6 +212,12 @@ UI_TRANSLATIONS = {
         "tone_high": "या प्रकरणात तात्काळ लक्ष आणि कारवाई आवश्यक आहे.",
         "tone_medium": "या प्रकरणात वेळेवर लक्ष देणे आवश्यक आहे.",
         "tone_low": "हे प्रकरण आपल्या विचारार्थ सादर केले जात आहे.",
+        "continue_case_btn": "🔄 हे प्रकरण सुरू ठेवा",
+        "followup_input_label": "तुमच्या शेवटच्या पायरीनंतर काय झाले?",
+        "followup_placeholder": "उदा. कंपनीकडून प्रतिसाद मिळाला नाही, तक्रार फेटाळली गेली, इ.",
+        "generate_followup_btn": "पुढील पायऱ्या मिळवा",
+        "followup_header": "🔄 फॉलो-अप मार्गदर्शन",
+        "followup_thinking": "तुमच्या अपडेटचे विश्लेषण सुरू आहे...",
     }
 }
 

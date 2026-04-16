@@ -1,7 +1,7 @@
 #TO RUN Locally --> streamlit run "Deployment\app.py"
 """To Deploy Updated --> 
 git add .
-git commit -m "Case history Upgrade(no database)"
+git commit -m "Case followup button(no database)"
 git push
 """
 #This file handles ONLY the UI flow and orchestrates calls to service modules.
@@ -24,7 +24,7 @@ from utils.helpers import (
     get_tone_for_category, get_authority_details,
     get_step_guidance, get_ui_text
 )
-from services.ai_service import analyze_legal_issue, generate_complaint_draft
+from services.ai_service import analyze_legal_issue, generate_complaint_draft, generate_followup
 from services.pdf_service import generate_pdf
 from services.email_service import send_email
 
@@ -43,6 +43,12 @@ EMAIL_PASS = st.secrets["EMAIL_PASS"]
 
 if "case_history" not in st.session_state:
     st.session_state.case_history = []
+if "last_case" not in st.session_state:
+    st.session_state.last_case = None
+if "followup_response" not in st.session_state:
+    st.session_state.followup_response = None
+if "show_followup_input" not in st.session_state:
+    st.session_state.show_followup_input = False
 
 def save_to_history():
     """Helper to save or update the current case in session state history."""
@@ -129,6 +135,17 @@ with st.sidebar:
                     st.session_state.step_plan = case.get("step_plan")
                     st.session_state.user_location = case.get("user_location", "")
                     st.session_state.language = case.get("language", "English")
+                    
+                    # Also Restore Last Case for Follow-up feature
+                    st.session_state.last_case = {
+                        "problem": case["problem"],
+                        "category": case["category"],
+                        "severity": case["severity"],
+                        "steps": case.get("step_plan", []),
+                        "complaint": case.get("complaint")
+                    }
+                    st.session_state.followup_response = None
+                    st.session_state.show_followup_input = False
                     
                     # Restore Input Widget state
                     st.session_state.user_problem_input = case["problem"]
@@ -238,6 +255,17 @@ if get_help_btn:
                 st.session_state.language = selected_language
                 st.session_state.complaint_draft = None  # Reset previous drafts
                 st.session_state.show_complaint_form = False
+                
+                # STORE LAST CASE for Follow-up feature
+                st.session_state.last_case = {
+                    "problem": user_input,
+                    "category": result["category"],
+                    "severity": result.get("severity", "LOW"),
+                    "steps": result.get("step_by_step_plan", []),
+                    "complaint": None
+                }
+                st.session_state.followup_response = None
+                st.session_state.show_followup_input = False
                 
                 # Save to history after successful analysis
                 save_to_history()
@@ -434,6 +462,9 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
                             st.session_state.complaint_draft = draft_result["draft"]
                             # Update history with the complaint draft
                             save_to_history()
+                            # Update last_case with complaint
+                            if st.session_state.last_case:
+                                st.session_state.last_case["complaint"] = draft_result["draft"]
                         else:
                             st.error(draft_result["error"])
 
@@ -508,6 +539,53 @@ if "llm_response" in st.session_state and st.session_state.llm_response:
                             st.success("Email sent successfully! ✅")
                         else:
                             st.error(f"Failed to send email: {error_msg}")
+
+    # ═══════════════════════════════════════════════════════════════
+    # FOLLOW-UP / CONTINUE CASE SECTION (Enhanced & Repositioned)
+    # ═══════════════════════════════════════════════════════════════
+    
+    # Show only if analysis is complete AND complaint is generated (at the end of flow)
+    if st.session_state.get("last_case") and st.session_state.get("complaint_draft"):
+        st.divider()
+        
+        if not st.session_state.show_followup_input:
+            col_fup1, col_fup2, col_fup3 = st.columns([1, 2, 1])
+            with col_fup2:
+                if st.button(tl("continue_case_btn"), use_container_width=True, type="secondary"):
+                    st.session_state.show_followup_input = True
+                    st.rerun()
+                st.caption(f"<center>{tl('continue_case_hint')}</center>", unsafe_allow_html=True)
+        
+        if st.session_state.show_followup_input:
+            st.markdown(f"### {tl('followup_header')}")
+            user_followup = st.text_area(tl("followup_input_label"), placeholder=tl("followup_placeholder"), key="followup_input_text")
+            
+            f_btn_col1, f_btn_col2 = st.columns([1.5, 3.5])
+            with f_btn_col1:
+                if st.button(tl("generate_followup_btn"), type="primary", use_container_width=True):
+                    if user_followup.strip():
+                        with st.spinner(tl("followup_thinking")):
+                            f_result = generate_followup(
+                                st.session_state.last_case,
+                                user_followup,
+                                st.session_state.language,
+                                GROQ_API_KEY
+                            )
+                            if f_result["success"]:
+                                st.session_state.followup_response = f_result
+                                st.rerun()
+                            else:
+                                st.error(f_result["error"])
+                    else:
+                        st.warning("Please enter what happened next.")
+
+        if st.session_state.get("followup_response"):
+            st.markdown("---")
+            st.markdown(f"#### {tl('followup_header')}")
+            st.info(st.session_state.followup_response["explanation"])
+            
+            for f_step in st.session_state.followup_response["next_steps"]:
+                st.markdown(f"- {f_step}")
 
 # ═══════════════════════════════════════════════════════════════
 # FOOTER
