@@ -181,3 +181,6 @@ cython_debug/
 .cursorindexingignore
 .env
 .streamlit/secrets.toml
+Deployment/.streamlit/secrets.toml
+.env
+*.env
