@@ -30,7 +30,12 @@ LawyersUp simplifies legal assistance by using AI to generate structured complai
 
 ## Screenshots
 
-i have not added yet
+## Home page
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/2eeb87da-0e4d-4b4c-9f95-5b08a3bfd0e1" />
+
+## Email feature
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/244111fb-f7cd-4c71-84db-048027d19136" />
+
 
 ## Planned Enhancements
 
